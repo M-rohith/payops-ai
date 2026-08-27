@@ -1,0 +1,6 @@
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
+import { getReconciliationIssues } from "@/lib/api";
+import { formatDate, formatMoney } from "@/lib/format";
+
+export default async function ReconciliationPage() { const issues = await getReconciliationIssues(); return <><PageHeader eyebrow="CONTROL CENTER" title="Reconciliation" description="Investigate mismatches between orders, payments, and settlement expectations."/><div className="mt-6 grid gap-4">{issues.map(i=><article className="rounded-xl border-l-4 border-l-amber-400 border-y-slate-200 border-r-slate-200 bg-white p-5 shadow-card" key={i.id}><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{i.issue_type.replaceAll("_", " ")}</p><h2 className="mt-2 font-semibold">{i.description}</h2></div><StatusBadge value={i.status}/></div><div className="mt-4 flex flex-wrap gap-5 text-sm text-slate-500"><span>Order: <b className="text-ink">{i.external_order_id ?? "—"}</b></span><span>Payment: <b className="text-ink">{i.external_payment_id ?? "—"}</b></span>{i.amount !== null && <span>Amount: <b className="text-ink">{formatMoney(i.amount)}</b></span>}<span>{formatDate(i.created_at)}</span></div></article>)}</div></>; }
