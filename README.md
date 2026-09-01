@@ -198,6 +198,12 @@ To test manually, start PostgreSQL, FastAPI, and Next.js, open `/copilot`, selec
 
 Privacy boundary: tool outputs are bounded and purpose-specific. Customer email and phone are never sent to the model; only a customer name is included when necessary for failed-payment or reconciliation questions. Complete payloads and hidden prompts are not logged.
 
+## Phase 5: offline reconciliation benchmark
+
+From `backend`, run `python -m app.evaluation.run --seed 42 --json` to evaluate 120 deterministic synthetic cases. No operational database or OpenAI access is required. Results include exact classifications, exception metrics, unresolved evidence and an ignored JSON report. See [benchmark documentation](docs/evaluation.md) for ground truth, denominators, isolation and limitations. This measures local synthetic reconciliation, not production capacity or universal accuracy.
+
+Phase 5.1 adds a separate robustness audit: `python -m app.evaluation.run --benchmark robustness --json`. Benchmark A remains frozen. See [evaluation integrity findings](docs/evaluation-integrity.md) for the separate scores and retained unsupported cases.
+
 ## Deferred features
 
 - Authentication and authorization
