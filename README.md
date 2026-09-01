@@ -204,6 +204,10 @@ From `backend`, run `python -m app.evaluation.run --seed 42 --json` to evaluate 
 
 Phase 5.1 adds a separate robustness audit: `python -m app.evaluation.run --benchmark robustness --json`. Benchmark A remains frozen. See [evaluation integrity findings](docs/evaluation-integrity.md) for the separate scores and retained unsupported cases.
 
+## Phase 6: evaluation and audit UI
+
+Open `/evaluation` to inspect Benchmark A and Benchmark B separately, review current cached runtime/throughput, filter all 156 case results, and expand individual cases for ground truth, engine reason, and summarized evidence. The visible synthetic-data disclaimer and split-capture limitation are intentional. The read-only backend endpoint is `GET /api/evaluation`; it performs no operational database reads or writes. Benchmark cases remain isolated from Copilot tools, so the page links only to the operational Copilot with that boundary stated explicitly.
+
 ## Deferred features
 
 - Authentication and authorization

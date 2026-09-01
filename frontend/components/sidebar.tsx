@@ -1,3 +1,7 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
 const navigation = [
   ["Overview", "/"],
   ["Payments", "/payments"],
@@ -5,9 +9,11 @@ const navigation = [
   ["Reconciliation", "/reconciliation"],
   ["Alerts", "/alerts"],
   ["PayOps AI", "/copilot"],
+  ["Evaluation", "/evaluation"],
 ];
 
 export function Sidebar() {
+  const pathname = usePathname();
   return (
     <aside className="flex w-full flex-col bg-ink px-5 py-6 text-white md:min-h-screen md:w-64">
       <div className="mb-8 flex items-center gap-3 px-2">
@@ -18,12 +24,13 @@ export function Sidebar() {
         </div>
       </div>
       <nav className="grid grid-cols-2 gap-1 md:grid-cols-1" aria-label="Primary navigation">
-        {navigation.map(([item, href], index) => (
+        {navigation.map(([item, href]) => (
           <a
             className={`rounded-lg px-3 py-2.5 text-sm transition-colors ${
-              index === 0 ? "bg-white/10 font-medium text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"
+              pathname === href ? "bg-white/10 font-medium text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"
             }`}
             href={href}
+            aria-current={pathname === href ? "page" : undefined}
             key={item}
           >
             {item}

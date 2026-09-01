@@ -29,7 +29,9 @@ Next.js Dashboard               [Phase 2 operational pages]
 
 ## Design boundaries
 
-Phase 5 adds a separate offline `app.evaluation` package: deterministic scenario generation → pure reconciliation → ground-truth comparison → metrics and auditable JSON. It does not read/write PostgreSQL, call OpenAI or alter operational reconciliation APIs. See [evaluation design and limitations](evaluation.md). Judge-facing UI is deferred to Phase 6.
+Phase 5 adds a separate offline `app.evaluation` package: deterministic scenario generation → pure reconciliation → ground-truth comparison → metrics and auditable JSON. It does not read/write PostgreSQL, call OpenAI or alter operational reconciliation APIs. See [evaluation design and limitations](evaluation.md).
+
+Phase 6 exposes cached, presentation-safe results at `GET /api/evaluation` and renders them at `/evaluation`. The API summarizes financial evidence rather than returning raw engine internals. It has no mutation routes or database dependency. Benchmark A and B remain separate; known split-capture failures and the developer-authored synthetic limitation are visible. Isolated benchmark records are not injected into PostgreSQL or exposed to the operational Copilot.
 
 Business calculations belong in backend services. The frontend consumes API responses and focuses on presentation. When AI support is added, the LLM will operate through narrow, auditable backend tools rather than receiving unrestricted database access.
 

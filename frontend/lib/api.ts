@@ -14,6 +14,10 @@ export type Payment = { id: number; external_payment_id: string; external_order_
 export type PaymentList = { items: Payment[]; total: number; limit: number; offset: number };
 export type Settlement = { id: number; external_settlement_id: string; expected_amount: number; actual_amount: number; difference: number; fees: number; adjustments: number; status: string; settled_at: string | null; created_at: string };
 export type ReconciliationIssue = { id: number; issue_type: string; description: string; status: string; order_id: number | null; external_order_id: string | null; payment_id: number | null; external_payment_id: string | null; amount: number | null; created_at: string };
+export type EvaluationCase = { case_id: string; benchmark: "specification" | "robustness"; benchmark_name: string; scenario: string; expected: string; predicted: string; correct: boolean; display_status: "correct" | "safe_unresolved" | "incorrect_unresolved" | "mismatch"; ground_truth_reason: string; engine_reason: string; evidence_summary: string[] };
+export type EvaluationMetrics = { cases_processed: number; total_correct: number; total_incorrect: number; clean_match_recall: number; exception_precision: number; exception_recall: number; exception_f1: number; exception_classification_accuracy: number; unresolved_count: number; unresolved_rate: number; correctly_unresolved: number; incorrectly_unresolved: number; false_positive_exceptions: number; missed_exceptions: number; misclassified_exception_types: number };
+export type EvaluationBenchmark = { key: "specification" | "robustness"; name: string; seed: number; dataset_version: string; dataset_sha256: string; synthetic: boolean; metrics: EvaluationMetrics; runtime_seconds: number; throughput_cases_per_second: number; scenario_distribution: Record<string, number>; cases: EvaluationCase[]; known_mismatches: EvaluationCase[] };
+export type EvaluationPayload = { generated_from: string; disclaimer: string; benchmarks: EvaluationBenchmark[]; known_limitation: { title: string; summary: string; detail: string } };
 
 const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
 
@@ -44,3 +48,4 @@ export const getAlerts = () => apiGet<Alert[]>("/api/alerts");
 export const getSettlements = () => apiGet<Settlement[]>("/api/settlements");
 export const getReconciliationIssues = () => apiGet<ReconciliationIssue[]>("/api/reconciliation/issues");
 export const getPayments = (query = "") => apiGet<PaymentList>(`/api/payments${query ? `?${query}` : ""}`);
+export const getEvaluation = () => apiGet<EvaluationPayload>("/api/evaluation");

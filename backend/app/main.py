@@ -6,6 +6,7 @@ from app.api.operations import router as operations_router
 from app.api.integrations import router as integrations_router
 from app.api.webhooks import router as webhooks_router
 from app.api.copilot import router as copilot_router
+from app.api.evaluation import router as evaluation_router
 from app.config import get_settings
 
 settings = get_settings()
@@ -30,3 +31,4 @@ app.include_router(operations_router)
 app.include_router(integrations_router)
 app.include_router(webhooks_router)
 app.include_router(copilot_router)
+app.include_router(evaluation_router)
