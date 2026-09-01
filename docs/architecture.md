@@ -1,42 +1,65 @@
-# PayOps AI Architecture
+# PayOps AI architecture
 
-## Phase 4
+PayOps AI separates operational persistence, deterministic financial logic, AI explanation, and synthetic evaluation. It remains read-only and uses Razorpay Test Mode only.
 
-The implementation contains the source-aware payment analytics stack, Razorpay Test Mode ingestion, and a controlled PayOps AI layer. The AI agent uses the OpenAI Responses API with strict custom tools and a static dispatcher. Each tool calls approved SQLAlchemy analytics/services; the model has no direct database or Razorpay access.
+## Operational data path
 
-Demo and Razorpay data are separated by merchant source: the deterministic merchant uses `demo`, and a single MVP integration merchant uses `razorpay`. Full multi-tenant OAuth/account linking is intentionally deferred.
+```mermaid
+flowchart TD
+    R[Razorpay Test Mode]
+    W[Signed webhook receiver]
+    API[FastAPI read APIs and entity upserts]
+    DB[(PostgreSQL)]
+    AN[Source-aware analytics and operational issue feed]
+    UI[Next.js operations dashboard]
 
-## Planned future data flow
-
-```text
-Razorpay Test Mode               [Phase 3A bounded reads/webhooks]
-   ↓
-Read APIs + Verified Webhooks    [Phase 3A]
-   ↓
-FastAPI Backend                 [Phase 2 APIs]
-   ↓
-PostgreSQL                      [Phase 2 demo schema and data]
-   ↓
-Analytics / Reconciliation      [Phase 2 foundational analytics]
-Anomaly Detection               [not implemented]
-   ↓
-Controlled PayOps AI Tools      [Phase 4 read-only]
-   ↓
-Responses API Reasoning         [Phase 4]
-   ↓
-Next.js Dashboard               [Phase 2 operational pages]
+    R -->|bounded API reads| API
+    R -->|events + raw-body HMAC signature| W
+    W -->|unique event ID + normalized upsert| DB
+    API --> DB
+    DB --> AN
+    AN --> UI
 ```
 
-## Design boundaries
+Demo and Razorpay records belong to separate merchants identified by `source=demo|razorpay`; `source=all` aggregates them only at the query layer. Webhook order is not assumed. Unique provider event IDs and external entity IDs provide idempotency and duplicate protection.
 
-Phase 5 adds a separate offline `app.evaluation` package: deterministic scenario generation → pure reconciliation → ground-truth comparison → metrics and auditable JSON. It does not read/write PostgreSQL, call OpenAI or alter operational reconciliation APIs. See [evaluation design and limitations](evaluation.md).
+## Controlled AI path
 
-Phase 6 exposes cached, presentation-safe results at `GET /api/evaluation` and renders them at `/evaluation`. The API summarizes financial evidence rather than returning raw engine internals. It has no mutation routes or database dependency. Benchmark A and B remain separate; known split-capture failures and the developer-authored synthetic limitation are visible. Isolated benchmark records are not injected into PostgreSQL or exposed to the operational Copilot.
+```mermaid
+flowchart LR
+    Q[User question + selected source] --> O[OpenAI Responses API]
+    O -->|strict function call| D[Static allowlisted dispatcher]
+    D --> T[Read-only backend tool]
+    T -->|bounded structured evidence| O
+    O --> C[Grounded Copilot response]
+```
 
-Business calculations belong in backend services. The frontend consumes API responses and focuses on presentation. When AI support is added, the LLM will operate through narrow, auditable backend tools rather than receiving unrestricted database access.
+The model receives no SQL/database tool, credentials, arbitrary code tool, or mutating financial function. Nine strict tools cover dashboard metrics, failure investigation, comparisons, bounded payment facts, settlement variance, reconciliation issues, alerts, and normalized payment details. Calls are validated, source-forced and capped at six rounds. Customer email and phone are removed from tool output.
 
-All money is stored as integer minor units (paise for INR). This avoids floating-point errors in payment, refund, and settlement calculations.
+## Deterministic evaluation path
 
-**Razorpay Live Mode and production account linking: NOT IMPLEMENTED.**
+```mermaid
+flowchart LR
+    G[Synthetic generator] -->|financial evidence| E[Reconciliation engine]
+    G -->|labels kept outside engine| V[Evaluator]
+    E -->|prediction + reason + evidence| V
+    V --> M[Metrics / confusion / case audit]
+    M --> J[GET /api/evaluation]
+    J --> UI[/evaluation]
+```
 
-PayOps AI is strictly advisory. No capture, refund, settlement, alert-resolution, reconciliation mutation, or other money-moving tool is exposed. Structured evidence remains in integer minor units; only the final human-facing answer formats rupees.
+Benchmark A is the frozen 120-case Specification Benchmark. Benchmark B is a separate 36-case adversarial Robustness Suite with a richer workflow adapter. They are scored independently. The evaluation package imports neither SQLAlchemy nor OpenAI and performs no operational database access. Results are cached once per backend process for the UI; CLI JSON remains generated and ignored.
+
+Ground truth is held by the evaluator, not passed to either decision function. The two retained B mismatches are unsupported split-capture matches safely returned as `UNRESOLVED`. See [metric definitions](evaluation.md) and the [integrity audit](evaluation-integrity.md).
+
+## Data and calculation boundaries
+
+- PostgreSQL stores money as integer minor units (paise for INR).
+- Backend services and deterministic rules perform calculations and data shaping.
+- The frontend displays API results and does not implement finance arithmetic.
+- The evaluation evidence model is isolated; benchmark cases never enter operational tables or Copilot tools.
+- The AI can explain operational evidence but cannot determine benchmark scores or perform mutations.
+
+## Explicit non-goals
+
+Razorpay Live Mode/account linking, authentication, production multi-tenancy, split-capture aggregation, general settlement-batch allocation, chargebacks/FX, and production observability are not implemented. No capture, refund, transfer, settlement, issue-resolution, or other money-moving tool exists.

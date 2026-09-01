@@ -6,7 +6,7 @@ The original suite is now **Benchmark A — Specification Benchmark**, frozen un
 
 This offline benchmark measures deterministic reconciliation of synthetic payment-operations evidence. It does not measure the LLM or the existing API's stored reconciliation issue feed. The existing feed has no matching engine to extract; operational APIs, SQLAlchemy models, Razorpay and Copilot remain unchanged.
 
-`backend/app/evaluation/` uses standard-library immutable dataclasses and explicit in-memory records. It does not import database configuration, SQLAlchemy, OpenAI, or the AI agent. It performs no network calls and never seeds operational tables. JSON output is suitable for later Phase 6 consumption, not currently connected to a UI or tool.
+`backend/app/evaluation/` uses standard-library immutable dataclasses and explicit in-memory records. It does not import database configuration, SQLAlchemy, OpenAI, or the AI agent. It performs no network calls and never seeds operational tables. JSON output supports offline audit, while the `/evaluation` page consumes a cached, presentation-safe API projection computed in memory.
 
 ## Running
 
@@ -61,4 +61,4 @@ Tests cover all category variants, reproducibility, independent intentionally-wr
 
 Synthetic benchmark accuracy does not imply universal production accuracy. This is a small, balanced specification benchmark, not a representative estimate of real incident prevalence. It excludes multi-attempt aggregation, split captures, cross-currency conversion, chargebacks, multi-payment settlement batches, taxes beyond supplied fees, asynchronous snapshot ordering and negative-net carry-forwards. It returns a primary issue, not an exhaustive multi-label diagnosis. Inputs are trusted typed benchmark structures, not a public ingestion API. No probabilistic confidence is claimed.
 
-Phase 6 may consume the JSON evidence and metrics in a judge-facing UI. No UI, evaluation persistence, live-data adapter, AI scoring or financial action is implemented here.
+The judge-facing `/evaluation` UI displays metrics and summarized evidence through `GET /api/evaluation`. No evaluation persistence, live-data adapter, AI scoring, or financial action is implemented.

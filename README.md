@@ -1,219 +1,303 @@
 # PayOps AI
 
-PayOps AI is a payment-operations copilot for businesses using Razorpay. Phase 4 adds controlled, read-only LLM reasoning over the existing PostgreSQL analytics and normalized payment records.
+**A read-only AI Finance Controller for payment operations that combines deterministic reconciliation with evidence-grounded AI investigation.**
 
-> **Razorpay Live Mode: NOT IMPLEMENTED.** PayOps AI is advisory and read-only: it cannot capture, refund, settle, resolve, or move money.
+Target track: **Track 04 — AI Finance Controller**, Razorpay Buildathon.
+
+> PayOps AI uses Razorpay **Test Mode** and synthetic evaluation data. It is an advisory and investigation system: it cannot capture, refund, transfer, settle, or otherwise move money.
+
+## The problem
+
+Payment-operations teams often reconcile orders, payment attempts, refunds, and settlements across separate records. Failures, delayed states, missing references, and legitimate fees can look similar, making manual investigation slow and error-prone. An LLM-only approach is unsafe for financial arithmetic because it can invent conclusions. Finance teams need deterministic checks, explicit uncertainty, and an audit trail for every explanation.
+
+## The solution
+
+PayOps AI combines:
+
+- Razorpay Test Mode API and signed webhook ingestion;
+- a source-aware operations dashboard for Demo, Razorpay Test, or All Data;
+- deterministic reconciliation over orders, payments, refunds, fees, adjustments, and settlements;
+- an allowlisted read-only AI tool layer for evidence-backed investigation;
+- `UNRESOLVED` safe failure when evidence is incomplete or contradictory; and
+- two reproducible synthetic benchmarks with a judge-facing case audit at `/evaluation`.
+
+The split is deliberate: **code decides financial classifications and arithmetic; AI selects controlled tools and explains structured evidence.** Benchmark correctness does not depend on OpenAI availability.
+
+## Why it fits AI Finance Controller
+
+PayOps AI demonstrates multi-source payment operations, settlement investigation, deterministic batch reconciliation, measurable exception precision/recall and local throughput, plus explicit unresolved cases. The Copilot complements those controls with grounded investigation; it does not replace them.
+
+## Key differentiators
+
+| Principle | Implementation |
+| --- | --- |
+| Deterministic financial correctness | Matching, refund aggregation, settlement arithmetic, precedence, and evaluation run in Python—not in an LLM. |
+| Controlled AI access | The OpenAI model can call only nine allowlisted read-only backend tools through a static dispatcher. |
+| Evidence grounding | Copilot answers show the selected source and friendly evidence/tool labels. |
+| Source isolation | `demo`, `razorpay`, and `all` are explicit API/UI scopes; demo records are not merged with Razorpay records. |
+| Safe failure | Missing or contradictory evidence produces `UNRESOLVED` rather than a fabricated explanation. |
+| Auditable evaluation | Specification and robustness benchmarks remain separate, deterministic, inspectable, and reproducible. |
 
 ## Architecture
 
-- **Frontend:** Next.js App Router, TypeScript, Tailwind CSS
-- **Backend:** FastAPI, SQLAlchemy, Pydantic
-- **Database:** PostgreSQL 16 for local development
-- **Local orchestration:** Docker Compose for PostgreSQL
+### Operational and AI path
 
-See [docs/architecture.md](docs/architecture.md) for the planned future data flow.
-
-## Repository structure
-
-```text
-payops-ai/
-├── frontend/       # Next.js dashboard
-├── backend/        # FastAPI application and tests
-├── database/       # Database notes and future migrations
-├── docs/           # Architecture documentation
-├── AGENTS.md
-├── .env.example
-├── docker-compose.yml
-└── README.md
+```mermaid
+flowchart LR
+    R[Razorpay Test Mode] -->|API reads / signed webhooks| F[FastAPI]
+    F --> P[(PostgreSQL)]
+    P --> A[Analytics and operational reconciliation]
+    A --> T[Allowlisted read-only tools]
+    U[User question] --> O[OpenAI Responses API]
+    O -->|function selection only| T
+    T -->|structured evidence| O
+    O --> C[PayOps AI Copilot]
+    F --> D[Next.js operations dashboard]
 ```
 
-## Prerequisites
+### Independent evaluation path
 
-- Node.js 20 or newer and npm
-- Python 3.11 or newer
+```mermaid
+flowchart LR
+    S[Synthetic cases + labels] -->|financial evidence only| E[Deterministic reconciliation]
+    S -->|ground truth retained by evaluator| V[Evaluator]
+    E -->|predicted classification| V
+    V --> M[Metrics and per-case audit]
+    M --> UI[Evaluation UI]
+```
+
+Ground-truth labels are held by the evaluator and are **not** passed to the reconciliation engine. See [architecture details](docs/architecture.md), [metric definitions](docs/evaluation.md), and the [integrity audit](docs/evaluation-integrity.md).
+
+## Technology stack
+
+- **Frontend:** Next.js App Router, React, TypeScript, Tailwind CSS, native accessible SVG charts, `react-markdown`, `remark-breaks`
+- **Backend:** Python, FastAPI, SQLAlchemy, Alembic, Pydantic
+- **Database:** PostgreSQL 16
+- **AI:** OpenAI Responses API, strict function/tool calling, static allowlisted dispatcher
+- **Payments:** Razorpay Test Mode API, webhooks, raw-body HMAC signature verification, event idempotency
+- **Infrastructure:** Docker and Docker Compose; zrok supported for local webhook tunnelling
+- **Verification:** pytest, TypeScript compiler, ESLint, Next.js production build
+
+Recharts is not a project dependency; the current volume chart is implemented directly with SVG.
+
+## Evaluation results
+
+These are **developer-authored synthetic benchmarks and are not independent production validation**. They measure deterministic reconciliation, not AI prose quality.
+
+| Metric | Benchmark A — Specification | Benchmark B — Robustness |
+| --- | ---: | ---: |
+| Seed | 42 | 314159 |
+| Cases | 120 (10 categories × 12) | 36 (18 scenarios × 2) |
+| Exact correctness | 120/120 | 34/36 (94.44%) |
+| Clean-match recall | 100% | 88.24% |
+| Exception precision / recall / F1 | 100% / 100% / 100% | 100% / 100% / 100% |
+| Exact exception classification | 100% | 100% |
+| Predicted unresolved | 12 | 11 |
+| Correctly / incorrectly unresolved | 12 / 0 | 9 / 2 |
+
+The two Benchmark B mismatches are expected `MATCHED` split-capture cases predicted `UNRESOLVED`. General split-capture aggregation is not supported; the engine refused to guess instead of declaring a false match or exception. Open `/evaluation` to inspect metrics, distributions, filters, reasons, and summarized evidence for all 156 cases.
+
+## Razorpay Test Mode integration
+
+Razorpay credentials are loaded from environment variables. The webhook receiver at `POST /api/webhooks/razorpay`:
+
+1. reads the original request bytes;
+2. verifies `X-Razorpay-Signature` using HMAC-SHA256 and `RAZORPAY_WEBHOOK_SECRET`;
+3. persists the provider event ID under a unique constraint for idempotency; and
+4. upserts normalized order, payment, or refund records by external ID.
+
+The handler does not assume webhook delivery order. Supported payment, order, and refund events can arrive more than once without creating duplicate normalized records. A real INR 100 Test Mode payment flow was validated locally. No Live Mode credential or resource is included.
+
+For local delivery, run the API and expose it with an installed/enabled zrok client:
+
+```powershell
+zrok share public localhost:8000
+```
+
+Configure the resulting HTTPS URL plus `/api/webhooks/razorpay` manually in the Razorpay Test Mode dashboard. The URL is ephemeral; do not commit it. Refer to the official [zrok HTTP sharing guide](https://docs.zrok.io/docs/1.0/concepts/http/) for account/client setup.
+
+## Controlled AI architecture
+
+```text
+User question
+    ↓
+OpenAI model
+    ↓
+Allowlisted function selection
+    ↓
+Read-only backend tool
+    ↓
+Structured payment evidence
+    ↓
+Grounded response with source and evidence labels
+```
+
+The model has no SQL tool, database connection, Razorpay credentials, refund/capture/transfer tool, or arbitrary code/database access. Tool calls are validated, source-scoped, bounded to six rounds, and return purpose-specific evidence. Customer email and phone are excluded from AI tool output. The ordinary test suite mocks OpenAI and requires no network access.
+
+## Quick start
+
+### Prerequisites
+
+- Git
 - Docker Desktop with Docker Compose
+- Python 3.11 or newer
+- Node.js 20 or newer with npm
 
-## Local development
+### 1. Clone and configure
 
-### 1. Configure environment variables
+```powershell
+git clone <repository-url>
+cd payops-ai
+Copy-Item .env.example .env
+```
 
-Copy `.env.example` to `.env` at the repository root. The included development defaults align with Docker Compose. Never commit `.env`.
+On macOS/Linux, use `cp .env.example .env`. The checked-in defaults configure local PostgreSQL. Add only the Test Mode and OpenAI secrets needed for the flows you plan to demonstrate. Never commit `.env`.
 
-For Razorpay Test Mode, configure `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` locally. Test keys begin with `rzp_test_`. Configure `RAZORPAY_WEBHOOK_SECRET` only after creating a webhook endpoint in the Razorpay dashboard. Never use Live Mode credentials in this project phase.
-
-For PayOps AI, configure `OPENAI_API_KEY` and optionally `OPENAI_MODEL` (default: `gpt-5.4-mini`). Secrets remain backend-only and must never be placed in frontend environment variables.
+```dotenv
+DATABASE_URL=postgresql+psycopg://payops:payops@localhost:5432/payops
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.4-mini
+FRONTEND_URL=http://localhost:3000
+BACKEND_URL=http://localhost:8000
+```
 
 ### 2. Start PostgreSQL
 
-```bash
+```powershell
+docker compose config --quiet
 docker compose up -d postgres
 docker compose ps
 ```
 
-The database is available at `localhost:5432`, with database, user, and password all set to `payops` for local development only.
+Wait for `payops-postgres` to report `healthy`.
 
-### 3. Apply migrations and seed demo data
+### 3. Install, migrate, and seed the backend
 
-```bash
+```powershell
 cd backend
 python -m venv .venv
-# activate the environment as shown below, then:
-pip install -r requirements.txt
-alembic upgrade head
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m alembic upgrade head
 python -m app.seed
-```
-
-The seed is deterministic and safe to rerun. It replaces only the named demo merchant dataset, preventing duplicate records.
-
-To reset/reseed development data, run:
-
-```bash
-cd backend
-alembic downgrade base
-alembic upgrade head
-python -m app.seed
-```
-
-The downgrade command deletes Phase 2 tables and their development data. For a non-destructive refresh, run only `python -m app.seed`.
-
-### 4. Start FastAPI
-
-```bash
-cd backend
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-Open `http://localhost:8000/health` or API documentation at `http://localhost:8000/docs`.
-
-To explicitly validate PostgreSQL connectivity after starting the service:
-
-```bash
-cd backend
 python -c "from app.database import check_database_connection; print(check_database_connection())"
 ```
 
-### 5. Start Next.js
+For macOS/Linux, activate with `source .venv/bin/activate`. `python -m app.seed` replaces only the named demo merchant dataset and is safe to rerun. It does not delete Razorpay-source records. Do not use `alembic downgrade base` unless you intentionally want to remove development tables/data.
 
-In a second terminal:
+### 4. Run the backend
 
-```bash
+```powershell
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Verify [health](http://localhost:8000/health) or open [FastAPI docs](http://localhost:8000/docs).
+
+### 5. Run the frontend
+
+In a second terminal from the repository root:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. The server-rendered Overview page requests its data from `BACKEND_URL` (default: `http://localhost:8000`). Start the API before loading the page.
+Open [http://localhost:3000](http://localhost:3000). Start the backend first because the Next.js pages load operational and evaluation data server-side.
 
-## Phase 2 functionality
+## Reproduce the evaluation
 
-- Relational merchant, customer, order, payment, refund, settlement, alert, and reconciliation models
-- Alembic-managed PostgreSQL schema
-- Repeatable 248-payment demo dataset with UPI failures, settlement discrepancy, refunds, and reconciliation mismatches
-- PostgreSQL-backed summary, volume series, and payment-method analytics for 1D/7D/30D periods
-- Functional Overview, Payments, Settlements, Reconciliation, and Alerts pages
-- Payment status/method/search filters and simple limit/offset pagination
-- Payment source filtering with `source=all` (default), `source=demo`, or `source=razorpay`; detail lookup accepts a local ID or external payment ID
-- Source-aware dashboard analytics use the same `source=all|demo|razorpay` contract. The Overview defaults to All Data and never performs a remote sync while rendering.
-- CORS configured for the local frontend origin
-- Backend scenario, analytics, API filter, monetary, and seed-idempotency tests
+From `backend` with its virtual environment active:
 
-## Phase 3A: Razorpay Test Mode foundation
+```powershell
+# Benchmark A — seed 42
+python -m app.evaluation.run --benchmark specification --json
 
-All Razorpay HTTP access is isolated under `backend/app/integrations/razorpay`. Requests use HTTP Basic authentication, bounded counts, explicit timeouts, and sanitized custom exceptions.
-
-Verify the configured read-only connection:
-
-```bash
-curl http://localhost:8000/api/integrations/razorpay/status
+# Benchmark B — seed 314159
+python -m app.evaluation.run --benchmark robustness --json
 ```
 
-Manually synchronize at most 25 recent entities per resource:
+Generated reports overwrite `backend/generated/evaluation/latest.json` and `robustness.json`. That directory is ignored. All serialized fields except runtime/throughput reproduce exactly for the same code and seed. Expect A to report no mismatches and B to report the two known split-capture `UNRESOLVED` cases. Timing is machine-dependent and measures only local in-memory generation, hashing, reconciliation, metrics, and report assembly—not API or payment-processing capacity.
 
-```bash
-curl -X POST "http://localhost:8000/api/integrations/razorpay/sync?count=25"
+## Verification commands
+
+```powershell
+# Backend
+cd backend
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m compileall -q app
+.\.venv\Scripts\python.exe -m app.evaluation.run --benchmark specification
+.\.venv\Scripts\python.exe -m app.evaluation.run --benchmark robustness
+
+# Frontend (from ../frontend)
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Sync is never run during application startup. It upserts by Razorpay external IDs and uses a dedicated local merchant whose `source` is `razorpay`; seeded records remain attached to the `demo` merchant and are not deleted or merged.
+## Five-minute demo path
 
-Dashboard summary, volume, payment-method, issue, settlement, alert, and reconciliation reads accept the same source values. Razorpay-only views return zero or an empty list when no local settlement, alert, or reconciliation record exists; the application does not fabricate operational records.
+1. State the payment-operations problem and deterministic-vs-AI design.
+2. Show source-aware dashboard metrics and payment records.
+3. Complete or show the normalized INR 100 Razorpay Test Mode payment.
+4. Ask Copilot why recent Razorpay payments failed and inspect its evidence chips.
+5. Ask about the demo settlement shortfall and show recorded arithmetic.
+6. Open Evaluation and contrast Benchmark A with the adversarial Benchmark B.
+7. Filter mismatches and expand a split-capture safe failure.
+8. Close on architecture, read-only boundaries, and honest limitations.
 
-### Webhooks
-
-The receiver is `POST /api/webhooks/razorpay`. It reads the original request bytes, verifies `X-Razorpay-Signature` with HMAC-SHA256 and `RAZORPAY_WEBHOOK_SECRET`, then persists the unique `x-razorpay-event-id` before applying an entity upsert. Missing configuration and invalid signatures fail closed.
-
-Supported events are `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, and `refund.processed`. Valid unsupported events are recorded and safely acknowledged.
-
-A public HTTPS endpoint is required before Razorpay can deliver webhooks to a local development machine. Creating a tunnel and configuring the resulting webhook URL in the Razorpay Test Mode dashboard remain manual steps; this application does not create dashboard webhooks automatically.
+## Repository structure
 
 ```text
-Razorpay Test Mode
-      ↓
-Public HTTPS/tunnel URL
-      ↓
-POST /api/webhooks/razorpay
-      ↓
-Raw-body signature verification
-      ↓
-Unique event-ID check
-      ↓
-Shared entity upsert
-      ↓
-PostgreSQL
+backend/
+  app/api/                 # Operational, webhook, Copilot, evaluation APIs
+  app/ai/                  # Prompt, strict tool schemas, dispatcher, agent loop
+  app/evaluation/          # Generators, deterministic engine, metrics, CLI
+  app/integrations/        # Razorpay Test Mode client, mapper, sync, webhooks
+  alembic/                 # PostgreSQL migrations
+  tests/                   # Backend regression and integrity tests
+frontend/
+  app/                     # Next.js routes, including /copilot and /evaluation
+  components/              # Dashboard, Copilot, and audit UI
+docs/                      # Architecture and detailed evaluation methodology
+database/                  # Database notes
+docker-compose.yml         # Local PostgreSQL 16 service
 ```
 
-## Phase 4: controlled PayOps AI
+## Known limitations
 
-PayOps AI uses the OpenAI Responses API with strict custom function tools. The model never receives a database connection, SQL capability, Razorpay credentials, or mutating functions. It selects from a static dispatcher of approved backend tools, receives structured results, and produces an evidence-based explanation.
+- Benchmarks are developer-authored synthetic evaluations, not independent production validation.
+- Split-capture aggregation and general multi-payment settlement allocation are unsupported.
+- Operational evidence adapters are narrower than a full production finance system.
+- Benchmark throughput is local in-memory reconciliation speed, not payment-processing capacity.
+- Benchmark cases are isolated and unavailable to operational Copilot tools.
+- AI access is read-only; there are no capture, refund, settlement, transfer, or resolution actions.
+- There is no production-scale multi-tenant deployment, authentication layer, or Live Mode account linking claim.
+- FX, chargebacks, broad tax inference, and production observability are outside the current scope.
 
-Available tools:
+## Screenshots
 
-- Dashboard summary
-- Payment failure statistics and reason breakdown
-- Failure-rate comparison
-- Bounded failed-payment facts
-- Settlement variance
-- Reconciliation issues
-- Recorded alerts
-- Normalized payment details
+No repository screenshots are currently included. Add reviewed dashboard, Copilot, and Evaluation screenshots under a future `docs/assets/` directory before submission if the platform benefits from static previews. Do not use screenshots containing credentials, personal data, tunnel URLs, or hidden operational details.
 
-The conversation endpoint is:
+## Submission checklist
 
-```text
-POST /api/copilot/query
-```
+- [x] Submission-grade README and architecture documentation
+- [x] Reproducible Specification and Robustness benchmark commands
+- [x] Known limitations and synthetic-data disclaimer
+- [x] Automated backend/frontend verification
+- [ ] Confirm public repository visibility and final repository URL
+- [ ] Add a license after choosing terms
+- [ ] Add reviewed screenshots if useful
+- [ ] Record and review the five-minute demo video
+- [ ] Complete Buildathon submission form/details
 
-Example request:
+## Security posture
 
-```json
-{"message":"Why are UPI payments failing today?","source":"demo"}
-```
+Secrets are loaded from ignored environment files. Webhook signatures are verified against the raw body, event IDs are unique, AI tools are read-only and source-scoped, the model has no direct database access, and benchmark execution is isolated from operational records. These are implementation controls—not a claim of PCI compliance, bank-grade security, or production security certification.
 
-The response contains the answer, selected source, tools used, and concise evidence labels. Tool calls are capped at six rounds. The normal test suite mocks OpenAI and does not require internet access.
+## License
 
-To test manually, start PostgreSQL, FastAPI, and Next.js, open `/copilot`, select a source, and use one of the starter questions. The Overview source is inherited when opening PayOps AI from its dashboard panel.
-
-Privacy boundary: tool outputs are bounded and purpose-specific. Customer email and phone are never sent to the model; only a customer name is included when necessary for failed-payment or reconciliation questions. Complete payloads and hidden prompts are not logged.
-
-## Phase 5: offline reconciliation benchmark
-
-From `backend`, run `python -m app.evaluation.run --seed 42 --json` to evaluate 120 deterministic synthetic cases. No operational database or OpenAI access is required. Results include exact classifications, exception metrics, unresolved evidence and an ignored JSON report. See [benchmark documentation](docs/evaluation.md) for ground truth, denominators, isolation and limitations. This measures local synthetic reconciliation, not production capacity or universal accuracy.
-
-Phase 5.1 adds a separate robustness audit: `python -m app.evaluation.run --benchmark robustness --json`. Benchmark A remains frozen. See [evaluation integrity findings](docs/evaluation-integrity.md) for the separate scores and retained unsupported cases.
-
-## Phase 6: evaluation and audit UI
-
-Open `/evaluation` to inspect Benchmark A and Benchmark B separately, review current cached runtime/throughput, filter all 156 case results, and expand individual cases for ground truth, engine reason, and summarized evidence. The visible synthetic-data disclaimer and split-capture limitation are intentional. The read-only backend endpoint is `GET /api/evaluation`; it performs no operational database reads or writes. Benchmark cases remain isolated from Copilot tools, so the page links only to the operational Copilot with that boundary stated explicitly.
-
-## Deferred features
-
-- Authentication and authorization
-- Razorpay Live Mode and production account linking
-- Automated webhook/tunnel configuration
-- Advanced anomaly detection
-- Refund, settlement, or payment actions
-- Autonomous financial actions or approval workflows
-- Production deployment and observability
+No license is currently included. Reviewers receive no implied reuse rights; the repository owner should choose and add appropriate terms before public release.

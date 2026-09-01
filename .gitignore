@@ -10,7 +10,17 @@ node_modules/
 .next/
 out/
 coverage/
+htmlcov/
+.coverage
+dist/
+build/
+*.egg-info/
 *.log
 *.tsbuildinfo
+.idea/
+.vscode/
+*.sqlite
+*.sqlite3
+*.db
 .DS_Store
 backend/generated/
