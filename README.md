@@ -16,12 +16,15 @@ PayOps AI combines:
 
 - Razorpay Test Mode API and signed webhook ingestion;
 - a source-aware operations dashboard for Demo, Razorpay Test, or All Data;
+- an Investigation Queue that deterministically prioritizes evidence-backed issues and routes them into the source-aware Copilot;
 - deterministic reconciliation over orders, payments, refunds, fees, adjustments, and settlements;
 - an allowlisted read-only AI tool layer for evidence-backed investigation;
 - `UNRESOLVED` safe failure when evidence is incomplete or contradictory; and
 - two reproducible synthetic benchmarks with a judge-facing case audit at `/evaluation`.
 
 The split is deliberate: **code decides financial classifications and arithmetic; AI selects controlled tools and explains structured evidence.** Benchmark correctness does not depend on OpenAI availability.
+
+Investigation priority is deterministic: a matching open alert supplies its recorded severity; otherwise `HIGH` requires at least ₹10,000 of exposure or a failure rate of at least 50% across three failures, `MEDIUM` marks remaining positive exposure/failures, and `LOW` is informational. AI does not assign priority and every action remains read-only.
 
 ## Why it fits AI Finance Controller
 
@@ -34,6 +37,7 @@ PayOps AI demonstrates multi-source payment operations, settlement investigation
 | Deterministic financial correctness | Matching, refund aggregation, settlement arithmetic, precedence, and evaluation run in Python—not in an LLM. |
 | Controlled AI access | The OpenAI model can call only nine allowlisted read-only backend tools through a static dispatcher. |
 | Evidence grounding | Copilot answers show the selected source and friendly evidence/tool labels. |
+| Investigation workflow | A read-only, deterministic queue turns existing operational evidence into source-aware Copilot investigations. |
 | Source isolation | `demo`, `razorpay`, and `all` are explicit API/UI scopes; demo records are not merged with Razorpay records. |
 | Safe failure | Missing or contradictory evidence produces `UNRESOLVED` rather than a fabricated explanation. |
 | Auditable evaluation | Specification and robustness benchmarks remain separate, deterministic, inspectable, and reproducible. |

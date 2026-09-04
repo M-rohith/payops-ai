@@ -31,9 +31,9 @@ def payment_failure_stats(session: Session, source: str, method: str | None, tim
     return {"source": source, "method": method, "time_range": time_range, "total_attempts": total, "failed_attempts": failed, "successful_attempts": successful, "failure_rate": round(failed / total * 100, 1) if total else 0.0, "affected_amount": failed_amount}
 
 
-def failure_reason_breakdown(session: Session, source: str, method: str | None, time_range: str) -> dict:
-    start = _start(time_range)
-    conditions = _payment_conditions(source, method, start) + [Payment.status == "failed"]
+def failure_reason_breakdown(session: Session, source: str, method: str | None, time_range: str, *, start: datetime | None = None, end: datetime | None = None) -> dict:
+    window_start = start or _start(time_range)
+    conditions = _payment_conditions(source, method, window_start, end) + [Payment.status == "failed"]
     rows = session.execute(select(func.coalesce(Payment.error_code, "UNKNOWN"), func.count(Payment.id), func.coalesce(func.sum(Payment.amount), 0)).select_from(Payment).join(Merchant, Payment.merchant_id == Merchant.id).where(*conditions).group_by(Payment.error_code).order_by(func.count(Payment.id).desc())).all()
     total = sum(int(row[1]) for row in rows)
     return {"source": source, "method": method, "time_range": time_range, "total_failures": total, "reasons": [{"error_code": code, "count": int(count), "percentage": round(int(count) / total * 100, 1) if total else 0.0, "affected_amount": int(amount)} for code, count, amount in rows]}

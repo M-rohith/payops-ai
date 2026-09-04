@@ -10,6 +10,8 @@ export type DashboardSummary = {
 export type VolumePoint = { timestamp: string; amount: number; payment_count: number };
 export type PaymentMethodMetric = { method: string; payment_count: number; amount: number };
 export type Alert = { id: number; type: string; severity: string; title: string; description: string; metric_value: number | null; baseline_value: number | null; status: string; created_at: string };
+export type InvestigationMetric = { label: string; value: number; format: "count" | "money" | "percent" | "percentage_points" };
+export type Investigation = { id: string; type: "payment_failure_spike" | "settlement_variance" | "reconciliation_issue" | "alert"; title: string; severity: "high" | "medium" | "low"; source: "demo" | "razorpay"; summary: string; metrics: InvestigationMetric[]; evidence: string[]; financial_impact: number; suggested_question: string };
 export type Payment = { id: number; external_payment_id: string; external_order_id: string; customer_name: string; source: "demo" | "razorpay"; amount: number; currency: string; method: string; status: string; error_code: string | null; error_description: string | null; captured: boolean; created_at: string };
 export type PaymentList = { items: Payment[]; total: number; limit: number; offset: number };
 export type Settlement = { id: number; external_settlement_id: string; expected_amount: number; actual_amount: number; difference: number; fees: number; adjustments: number; status: string; settled_at: string | null; created_at: string };
@@ -44,6 +46,7 @@ async function apiGet<T>(path: string): Promise<T> {
 export const getVolume = (range: string, source: DataSource = "all") => apiGet<VolumePoint[]>(`/api/dashboard/volume?time_range=${range}&source=${source}`);
 export const getPaymentMethods = (range = "30D", source: DataSource = "all") => apiGet<PaymentMethodMetric[]>(`/api/dashboard/payment-methods?time_range=${range}&source=${source}`);
 export const getIssues = (source: DataSource = "all") => apiGet<Alert[]>(`/api/dashboard/issues?source=${source}`);
+export const getInvestigations = (source: DataSource = "all") => apiGet<Investigation[]>(`/api/investigations?source=${source}`);
 export const getAlerts = () => apiGet<Alert[]>("/api/alerts");
 export const getSettlements = () => apiGet<Settlement[]>("/api/settlements");
 export const getReconciliationIssues = () => apiGet<ReconciliationIssue[]>("/api/reconciliation/issues");

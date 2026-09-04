@@ -41,9 +41,9 @@ function AssistantMarkdown({ children }: { children: string }) {
   );
 }
 
-export function CopilotChat({ initialSource = "demo" }: { initialSource?: DataSource }) {
+export function CopilotChat({ initialSource = "demo", initialQuestion = "" }: { initialSource?: DataSource; initialQuestion?: string }) {
   const [source, setSource] = useState<DataSource>(initialSource);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialQuestion);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

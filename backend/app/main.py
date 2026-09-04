@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.dashboard import router as dashboard_router
 from app.api.operations import router as operations_router
 from app.api.integrations import router as integrations_router
+from app.api.investigations import router as investigations_router
 from app.api.webhooks import router as webhooks_router
 from app.api.copilot import router as copilot_router
 from app.api.evaluation import router as evaluation_router
@@ -29,6 +30,7 @@ def health() -> dict[str, str]:
 app.include_router(dashboard_router)
 app.include_router(operations_router)
 app.include_router(integrations_router)
+app.include_router(investigations_router)
 app.include_router(webhooks_router)
 app.include_router(copilot_router)
 app.include_router(evaluation_router)
